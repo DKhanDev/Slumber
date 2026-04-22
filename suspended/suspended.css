@@ -1,0 +1,176 @@
+/* ─── Reset ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ─── Root ────────────────────────────────────────────────────── */
+:root {
+  --c-bg:       #0f0f0f;
+  --c-text:     #f0f0f0;
+  --c-text-2:   #666;
+  --c-text-3:   #3a3a3a;
+  --c-border:   rgba(255,255,255,0.08);
+  --c-surface:  rgba(255,255,255,0.04);
+  --c-btn-bg:   rgba(255,255,255,0.07);
+  --c-btn-hover:rgba(255,255,255,0.11);
+  --c-btn-border:rgba(255,255,255,0.12);
+  --c-kbd:      rgba(255,255,255,0.06);
+  --ease:       cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --c-bg:        #f7f7f6;
+    --c-text:      #111110;
+    --c-text-2:    #999;
+    --c-text-3:    #d0d0cf;
+    --c-border:    rgba(0,0,0,0.07);
+    --c-surface:   rgba(0,0,0,0.03);
+    --c-btn-bg:    rgba(0,0,0,0.05);
+    --c-btn-hover: rgba(0,0,0,0.08);
+    --c-btn-border:rgba(0,0,0,0.10);
+    --c-kbd:       rgba(0,0,0,0.05);
+  }
+}
+
+/* ─── Page ────────────────────────────────────────────────────── */
+html, body {
+  height: 100%;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+/* ─── Stage ───────────────────────────────────────────────────── */
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  animation: appear 0.5s var(--ease) both;
+}
+
+@keyframes appear {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Moon ────────────────────────────────────────────────────── */
+.moon-wrap {
+  margin-bottom: 6px;
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+.moon {
+  width: 52px;
+  height: 52px;
+  color: var(--c-text-3);
+  display: block;
+}
+
+/* ─── Identity ────────────────────────────────────────────────── */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.site-favicon {
+  border-radius: 4px;
+  object-fit: contain;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.site-favicon[src=""],
+.site-favicon:not([src]) {
+  display: none;
+}
+
+.site-title {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--c-text);
+  max-width: 560px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Domain ──────────────────────────────────────────────────── */
+.site-domain {
+  font-size: 13px;
+  color: var(--c-text-2);
+  letter-spacing: 0.01em;
+}
+
+/* ─── Wake button ─────────────────────────────────────────────── */
+.wake-btn {
+  margin-top: 8px;
+  padding: 10px 28px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text);
+  background: var(--c-btn-bg);
+  border: 0.5px solid var(--c-btn-border);
+  border-radius: 8px;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: background 0.15s, transform 0.1s;
+}
+.wake-btn:hover  { background: var(--c-btn-hover); }
+.wake-btn:active { transform: scale(0.97); }
+.wake-btn:focus-visible {
+  outline: 2px solid var(--c-text);
+  outline-offset: 3px;
+}
+
+/* ─── Asleep since ────────────────────────────────────────────── */
+.asleep-since {
+  font-size: 12px;
+  color: var(--c-text-2);
+  opacity: 0.7;
+}
+
+/* ─── Hint footer ─────────────────────────────────────────────── */
+.hint {
+  position: fixed;
+  bottom: 24px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--c-text-2);
+  opacity: 0;
+  animation: fade-hint 0.4s ease 1.2s forwards;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes fade-hint {
+  to { opacity: 0.6; }
+}
+
+kbd {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 1px 5px;
+  background: var(--c-kbd);
+  border: 0.5px solid var(--c-btn-border);
+  border-radius: 4px;
+  line-height: 1.6;
+}

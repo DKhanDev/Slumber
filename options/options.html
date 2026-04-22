@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slumber — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+
+  <div class="layout">
+
+    <!-- Sidebar nav -->
+    <nav class="sidebar" aria-label="Settings sections">
+      <div class="sidebar-logo">
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <path d="M46 33C46 41.84 38.84 49 30 49C21.16 49 14 41.84 14 33C14 24.16 21.16 17 30 17C31.62 17 33.18 17.23 34.64 17.65C30.7 19.69 28 23.84 28 28.6C28 35.45 33.55 41 40.4 41C42.46 41 44.38 40.46 46.05 39.52C46.02 37.36 46 35.18 46 33Z" fill="currentColor"/>
+        </svg>
+        <span class="sidebar-logo-name">Slumber</span>
+      </div>
+
+      <ul class="nav-list" role="list">
+        <li><a class="nav-item active" href="#general"   data-section="general">General</a></li>
+        <li><a class="nav-item"        href="#whitelist" data-section="whitelist">Whitelist</a></li>
+        <li><a class="nav-item"        href="#license"   data-section="license">License</a></li>
+        <li><a class="nav-item"        href="#stats"     data-section="stats">Stats</a></li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <span class="version-label" id="version-label">v0.1.0</span>
+        <a class="sidebar-link" id="link-github" href="#" target="_blank">GitHub ↗</a>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- First-run welcome (shown once on install) -->
+      <div class="welcome-card" id="welcome-card" hidden>
+        <div class="welcome-card-inner">
+          <span class="welcome-card-moon">🌙</span>
+          <div>
+            <p class="welcome-card-title">Welcome to Slumber</p>
+            <p class="welcome-card-body">You're all set. Tabs will automatically sleep after 30 minutes of inactivity. Adjust the timer below, set up a whitelist, or upgrade to Pro for unlimited suspensions.</p>
+          </div>
+        </div>
+        <button class="welcome-card-dismiss" id="welcome-card-dismiss">Got it</button>
+      </div>
+
+      <!-- ── General ─────────────────────────────────────────── -->
+      <section class="section active" id="section-general" aria-labelledby="h-general">
+        <h1 class="section-title" id="h-general">General</h1>
+
+        <div class="card">
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="toggle-auto">Auto-suspend</label>
+              <p class="setting-hint">Automatically suspend tabs that have been inactive for a set period.</p>
+            </div>
+            <label class="toggle" aria-label="Toggle auto-suspend">
+              <input type="checkbox" id="toggle-auto" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="setting-row indent" id="row-delay">
+            <label class="setting-label" for="input-delay">Suspend after</label>
+            <div class="inline-input-wrap">
+              <input type="number" id="input-delay" class="number-input" min="1" max="480" value="30" />
+              <span class="setting-unit">minutes of inactivity</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="toggle-pinned">Suspend pinned tabs</label>
+              <p class="setting-hint">Pinned tabs are usually persistent — off by default.</p>
+            </div>
+            <label class="toggle" aria-label="Toggle pinned tab suspension">
+              <input type="checkbox" id="toggle-pinned" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="toggle-audible">Suspend tabs playing audio</label>
+              <p class="setting-hint">Never cut off music, calls, or video mid-session.</p>
+            </div>
+            <label class="toggle" aria-label="Toggle audio tab suspension">
+              <input type="checkbox" id="toggle-audible" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card" id="card-sync">
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="toggle-sync">
+                Sync settings across devices
+                <span class="pro-chip">Pro</span>
+              </label>
+              <p class="setting-hint">Uses Chrome Sync to keep your settings in sync across all signed-in Chrome instances.</p>
+            </div>
+            <label class="toggle" aria-label="Toggle settings sync">
+              <input type="checkbox" id="toggle-sync" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn-primary" id="btn-save-general">Save changes</button>
+          <span class="save-confirm" id="save-confirm-general" hidden>Saved ✓</span>
+        </div>
+      </section>
+
+      <!-- ── Whitelist ───────────────────────────────────────── -->
+      <section class="section" id="section-whitelist" aria-labelledby="h-whitelist" hidden>
+        <div class="section-title-row">
+          <h1 class="section-title" id="h-whitelist">Whitelist</h1>
+          <span class="pro-chip">Pro</span>
+        </div>
+        <p class="section-desc">Domains added here will never be suspended, regardless of inactivity. Subdomains are matched automatically — adding <code>google.com</code> also protects <code>mail.google.com</code>.</p>
+
+        <div class="card" id="whitelist-card">
+          <!-- Add domain row -->
+          <div class="whitelist-add-row">
+            <input
+              type="text"
+              id="whitelist-input"
+              class="text-input"
+              placeholder="e.g. notion.so or mail.google.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button class="btn-primary" id="btn-add-domain">Add domain</button>
+          </div>
+
+          <!-- Domain list -->
+          <div class="domain-list" id="domain-list" role="list">
+            <!-- Populated by options.js -->
+          </div>
+
+          <p class="empty-domains" id="empty-domains">No domains added yet.</p>
+        </div>
+
+        <div class="action-row">
+          <button class="btn-secondary" id="btn-clear-whitelist">Clear all</button>
+          <span class="save-confirm" id="save-confirm-whitelist" hidden>Saved ✓</span>
+        </div>
+      </section>
+
+      <!-- ── License ─────────────────────────────────────────── -->
+      <section class="section" id="section-license" aria-labelledby="h-license" hidden>
+        <h1 class="section-title" id="h-license">License</h1>
+
+        <!-- Pro active state -->
+        <div class="card pro-active-card" id="pro-active-card" hidden>
+          <div class="pro-active-inner">
+            <div class="pro-badge-large">Pro</div>
+            <div>
+              <p class="pro-active-title">Slumber Pro is active</p>
+              <p class="pro-active-hint">Unlimited tab suspensions, bulk select, domain whitelist, and cross-device sync are all enabled.</p>
+            </div>
+          </div>
+          <p class="pro-active-hint" style="margin-top: 12px;">
+            To manage your subscription or transfer to a different account,
+            <a id="link-manage" href="#" class="text-link">sign in to your ExtensionPay account</a>.
+          </p>
+        </div>
+
+        <!-- Free state -->
+        <div class="card" id="free-card">
+          <p class="free-desc">
+            Slumber Pro unlocks unlimited tab suspension, bulk select, domain whitelist, and cross-device sync — for a one-time payment of <strong>$4.99</strong>.
+          </p>
+          <ul class="pro-features-list">
+            <li>✓ Unlimited suspended tabs</li>
+            <li>✓ Bulk select &amp; sleep</li>
+            <li>✓ Domain whitelist</li>
+            <li>✓ Cross-device sync via Chrome account</li>
+          </ul>
+          <button class="btn-primary btn-buy" id="btn-upgrade">
+            Upgrade to Pro →
+          </button>
+          <p class="pro-login-hint">
+            Already paid?
+            <a href="#" id="link-login" class="text-link">Sign in to restore access</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- ── Stats ───────────────────────────────────────────── -->
+      <section class="section" id="section-stats" aria-labelledby="h-stats" hidden>
+        <h1 class="section-title" id="h-stats">Stats</h1>
+        <p class="section-desc">Counts are stored locally and reset if you uninstall the extension.</p>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-value" id="stat-total-suspended">—</span>
+            <span class="stat-label">Tabs suspended (all time)</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-currently-sleeping">—</span>
+            <span class="stat-label">Currently sleeping</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-memory">—</span>
+            <span class="stat-label">Est. memory saved</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-days-active">—</span>
+            <span class="stat-label">Days active</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 24px;">
+          <div class="setting-row" style="border:none; padding: 0;">
+            <div class="setting-info">
+              <p class="setting-label">Reset stats</p>
+              <p class="setting-hint">Clears all counters. Cannot be undone.</p>
+            </div>
+            <button class="btn-danger-sm" id="btn-reset-stats">Reset</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>

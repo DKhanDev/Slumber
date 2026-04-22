@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sleeping…</title>
+  <link rel="stylesheet" href="suspended.css" />
+</head>
+<body>
+
+  <main class="stage">
+
+    <!-- Moon glyph -->
+    <div class="moon-wrap" id="moon-wrap" aria-hidden="true">
+      <svg class="moon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M54 34C54 46.15 44.15 56 32 56C19.85 56 10 46.15 10 34C10 21.85 19.85 12 32 12C34.2 12 36.32 12.32 38.3 12.9C33.08 15.7 29.5 21.18 29.5 27.5C29.5 36.61 36.89 44 46 44C48.82 44 51.47 43.24 53.74 41.9C53.91 39.3 54 36.66 54 34Z"
+          fill="currentColor"
+        />
+      </svg>
+    </div>
+
+    <!-- Site identity -->
+    <div class="identity" id="identity">
+      <img class="site-favicon" id="site-favicon" src="" alt="" width="20" height="20" />
+      <span class="site-title" id="site-title">Sleeping tab</span>
+    </div>
+
+    <!-- Domain -->
+    <p class="site-domain" id="site-domain"></p>
+
+    <!-- CTA -->
+    <button class="wake-btn" id="wake-btn" aria-label="Wake this tab">
+      Click to wake
+    </button>
+
+    <!-- Time asleep -->
+    <p class="asleep-since" id="asleep-since"></p>
+
+  </main>
+
+  <!-- Keyboard hint -->
+  <footer class="hint" id="hint">
+    Press <kbd>Space</kbd> or <kbd>Enter</kbd> to wake
+  </footer>
+
+  <script src="suspended.js"></script>
+</body>
+</html>
