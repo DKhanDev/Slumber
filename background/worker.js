@@ -1,60 +1,212 @@
 /**
- * worker.js — Slumber service worker (MV3)
+ * worker.js — Slumber service worker (classic, non-module)
  *
- * Responsibilities:
- *  - Bootstrap ExtPay on install / startup
- *  - Bootstrap alarms on install / startup
- *  - Route chrome.alarms → suspender
- *  - Route messages from popup → suspender / storage / license
- *  - Listen for tab events to reset idle timers
+ * All background modules are inlined here so we can use importScripts()
+ * to load ExtPay.js without needing "type":"module" on the service worker.
+ * Top-level await is not allowed in service workers — this avoids that entirely.
  *
- * MV3 SERVICE WORKER NOTE (from ExtPay docs):
- *   `extpay` becomes undefined inside service worker callbacks when declared
- *   at the top level. isPro() and openPaymentPage() in pro.js each re-declare
- *   ExtPay(EXTPAY_ID) internally, which is the correct workaround.
- *   startBackground() must only be called once — here at the top level.
+ * Load order:
+ *   1. ExtPay.js       — sets globalThis.ExtPay
+ *   2. This file       — uses ExtPay, defines all logic
  */
 
-import { ExtPay } from '../ExtPay.esm.js';
-import { EXTPAY_ID, isPro, openPaymentPage } from './pro.js';
-import { suspendTab, suspendTabs, unsuspendTab } from './suspender.js';
-import { getSettings, getSuspendedRegistry } from './storage.js';
-import {
-  ALARM_PREFIX,
-  SWEEP_ALARM,
-  scheduleTabAlarm,
-  clearTabAlarm,
-  sweepOrphanedAlarms,
-} from './alarms.js';
+importScripts('../ExtPay.js');
 
 // ---------------------------------------------------------------------------
-// ExtPay — call startBackground() once at top level
+// ExtPay init — startBackground() called once at top level
 // ---------------------------------------------------------------------------
 
+const EXTPAY_ID = 'slumber-pro';
 const extpay = ExtPay(EXTPAY_ID);
 extpay.startBackground();
 
-const SWEEP_INTERVAL = 5; // minutes
+// ---------------------------------------------------------------------------
+// ── alarms.js ───────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+
+const ALARM_PREFIX = 'slumber-tab-';
+const SWEEP_ALARM  = 'slumber-sweep';
+
+async function scheduleTabAlarm(tabId, delayInMinutes) {
+  const alarmName = `${ALARM_PREFIX}${tabId}`;
+  await chrome.alarms.clear(alarmName);
+  await chrome.alarms.create(alarmName, { delayInMinutes });
+}
+
+async function clearTabAlarm(tabId) {
+  await chrome.alarms.clear(`${ALARM_PREFIX}${tabId}`);
+}
+
+async function sweepOrphanedAlarms() {
+  const [alarms, tabs] = await Promise.all([
+    chrome.alarms.getAll(),
+    chrome.tabs.query({}),
+  ]);
+  const tabIds = new Set(tabs.map(t => t.id));
+  await Promise.all(
+    alarms
+      .filter(a => a.name.startsWith(ALARM_PREFIX))
+      .filter(a => !tabIds.has(parseInt(a.name.slice(ALARM_PREFIX.length), 10)))
+      .map(a => chrome.alarms.clear(a.name))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ── storage.js ──────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+
+const FREE_TIER_LIMIT = 10;
+
+async function getSettings() {
+  const { settings } = await chrome.storage.local.get('settings');
+  return settings ?? defaultSettings();
+}
+
+async function getSuspendedRegistry() {
+  const { suspended } = await chrome.storage.local.get('suspended');
+  return suspended ?? {};
+}
+
+function defaultSettings() {
+  return {
+    autoSuspend:      true,
+    autoSuspendDelay: 30,
+    suspendPinned:    false,
+    suspendAudible:   false,
+    whitelist:        [],
+    syncSettings:     false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ── pro.js ──────────────────────────────────────────────────────────────────
+// MV3 note: top-level extpay goes undefined in callbacks — re-declare inside
+// each function that needs it. startBackground() must only be called once.
+// ---------------------------------------------------------------------------
+
+async function isPro() {
+  try {
+    const ep = ExtPay(EXTPAY_ID);
+    const user = await ep.getUser();
+    return Boolean(user.paid);
+  } catch (err) {
+    console.warn('[Slumber] ExtPay getUser error — defaulting to false:', err);
+    return false;
+  }
+}
+
+function openPaymentPage() {
+  const ep = ExtPay(EXTPAY_ID);
+  ep.openPaymentPage();
+}
+
+// ---------------------------------------------------------------------------
+// ── suspender.js ────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+
+const SUSPENDED_PAGE = chrome.runtime.getURL('suspended/suspended.html');
+
+async function suspendTab(tabId, opts = {}) {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab) return;
+
+  if (isSlumberPage(tab.url)) return;
+  if (opts.source === 'auto' && tab.active) return;
+  if (await isExempt(tab)) return;
+
+  if (!await isPro()) {
+    const registry = await getSuspendedRegistry();
+    if (Object.keys(registry).length >= FREE_TIER_LIMIT) {
+      console.info(`[Slumber] Free tier limit (${FREE_TIER_LIMIT}) reached. Skipping tab ${tabId}.`);
+      return;
+    }
+  }
+
+  const entry = {
+    url:         tab.url,
+    title:       tab.title || tab.url,
+    favicon:     tab.favIconUrl || '',
+    suspendedAt: Date.now(),
+  };
+
+  const registry = await getSuspendedRegistry();
+  registry[tabId] = entry;
+
+  const { slumber_stats: stats = {} } = await chrome.storage.local.get('slumber_stats');
+  stats.totalSuspended = (stats.totalSuspended ?? 0) + 1;
+  if (!stats.installDate) stats.installDate = Date.now();
+
+  await chrome.storage.local.set({ suspended: registry, slumber_stats: stats });
+  await chrome.tabs.update(tabId, { url: buildSuspendedUrl(entry) });
+  await clearTabAlarm(tabId);
+}
+
+async function suspendTabs(tabIds, opts = {}) {
+  for (const tabId of tabIds) {
+    await suspendTab(tabId, opts);
+  }
+}
+
+async function unsuspendTab(tabId) {
+  const registry = await getSuspendedRegistry();
+  const entry = registry[tabId];
+  if (!entry) return;
+
+  await chrome.tabs.update(tabId, { url: entry.url });
+  delete registry[tabId];
+  await chrome.storage.local.set({ suspended: registry });
+}
+
+function buildSuspendedUrl({ url, title, favicon }) {
+  const hash = new URLSearchParams({ url, title, favicon }).toString();
+  return `${SUSPENDED_PAGE}#${hash}`;
+}
+
+function isSlumberPage(url = '') {
+  return url.startsWith(SUSPENDED_PAGE);
+}
+
+async function isExempt(tab) {
+  const settings = await getSettings();
+
+  if (tab.pinned && !settings.suspendPinned) return true;
+  if (tab.audible && !settings.suspendAudible) return true;
+
+  if (!tab.url
+    || tab.url.startsWith('chrome://')
+    || tab.url.startsWith('chrome-extension://')
+    || tab.url.startsWith('about:')
+    || tab.url.startsWith('file://')
+  ) return true;
+
+  if (settings.whitelist?.length && await isPro()) {
+    const tabHost = extractHostname(tab.url);
+    if (settings.whitelist.some(d => tabHost === d || tabHost.endsWith(`.${d}`))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function extractHostname(url) {
+  try { return new URL(url).hostname; }
+  catch { return ''; }
+}
 
 // ---------------------------------------------------------------------------
 // Install / startup
 // ---------------------------------------------------------------------------
 
+const SWEEP_INTERVAL = 5;
+
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === 'install') {
     await chrome.storage.local.set({
-      settings: {
-        autoSuspend:      true,
-        autoSuspendDelay: 30,
-        suspendPinned:    false,
-        suspendAudible:   false,
-        whitelist:        [],
-        syncSettings:     false,
-      },
-      suspended:     {},
+      settings:     defaultSettings(),
+      suspended:    {},
       slumber_stats: { totalSuspended: 0, installDate: Date.now() },
     });
-
     await chrome.tabs.create({
       url: chrome.runtime.getURL('options/options.html#general'),
     });
@@ -78,7 +230,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     await sweepOrphanedAlarms();
     return;
   }
-
   if (alarm.name.startsWith(ALARM_PREFIX)) {
     const tabId = parseInt(alarm.name.slice(ALARM_PREFIX.length), 10);
     await handleAutoSuspend(tabId);
@@ -106,22 +257,17 @@ async function handleAutoSuspend(tabId) {
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const settings = await getSettings();
-  if (settings.autoSuspend) {
-    await scheduleTabAlarm(tabId, settings.autoSuspendDelay);
-  }
+  if (settings.autoSuspend) await scheduleTabAlarm(tabId, settings.autoSuspendDelay);
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (!changeInfo.url) return;
   const settings = await getSettings();
-  if (settings.autoSuspend) {
-    await scheduleTabAlarm(tabId, settings.autoSuspendDelay);
-  }
+  if (settings.autoSuspend) await scheduleTabAlarm(tabId, settings.autoSuspendDelay);
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   await clearTabAlarm(tabId);
-
   const registry = await getSuspendedRegistry();
   if (registry[tabId]) {
     delete registry[tabId];
@@ -179,10 +325,8 @@ async function handleMessage({ type, payload }) {
     case 'SAVE_SETTINGS': {
       const { settings } = payload;
       await chrome.storage.local.set({ settings });
-
       const alarms = await chrome.alarms.getAll();
       const tabAlarms = alarms.filter(a => a.name.startsWith(ALARM_PREFIX));
-
       if (settings.autoSuspend) {
         const tabs = await chrome.tabs.query({});
         await Promise.all(tabs.map(t => scheduleTabAlarm(t.id, settings.autoSuspendDelay)));

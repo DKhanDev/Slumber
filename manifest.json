@@ -16,8 +16,7 @@
   ],
 
   "background": {
-    "service_worker": "background/worker.js",
-    "type": "module"
+    "service_worker": "background/worker.js"
   },
 
   "action": {
@@ -42,12 +41,8 @@
 
   "web_accessible_resources": [
     {
-      "resources": [
-        "suspended/suspended.html",
-        "ExtPay.js",
-        "ExtPay.esm.js"
-      ],
-      "matches": ["<all_urls>"]
+      "resources": ["suspended/suspended.html"],
+      "matches":   ["<all_urls>"]
     }
   ],
 
