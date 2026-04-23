@@ -196,12 +196,12 @@ function buildTabRow(tab, sleeping) {
   // While a just-woken tab is still navigating away from the suspended page,
   // Chrome reports the extension icon as favIconUrl and the 💤 title. Parse
   // the original metadata directly from the suspended page URL hash instead.
-  const transitioning = !sleeping && !!tab.favIconUrl?.startsWith(extensionOrigin);
-  const meta          = transitioning ? parseSuspendedPageMeta(tab.url) : null;
+  const transitioning  = !sleeping && !!tab.favIconUrl?.startsWith(extensionOrigin);
+  const suspendedMeta  = transitioning ? parseSuspendedPageMeta(tab.url) : null;
 
   const faviconUrl = sleeping
     ? chrome.runtime.getURL('icons/icon-16.png')
-    : (transitioning ? (meta.favicon || '') : (tab.favIconUrl || ''));
+    : (transitioning ? (suspendedMeta.favicon || '') : (tab.favIconUrl || ''));
 
   if (faviconUrl) {
     faviconEl = document.createElement('img');
@@ -223,13 +223,13 @@ function buildTabRow(tab, sleeping) {
   title.className = 'tab-title';
   title.textContent = sleeping
     ? (state.registry[tab.id]?.title || tab.title || 'Sleeping tab')
-    : (transitioning ? (meta.title || tab.title || tab.url) : (tab.title || tab.url));
+    : (transitioning ? (suspendedMeta.title || tab.title || tab.url) : (tab.title || tab.url));
 
   const domain = document.createElement('div');
   domain.className = 'tab-domain';
   domain.textContent = extractDomain(sleeping
     ? (state.registry[tab.id]?.url || '')
-    : (transitioning ? meta.url : (tab.url || '')));
+    : (transitioning ? suspendedMeta.url : (tab.url || '')));
 
   meta.append(title, domain);
 
