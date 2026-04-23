@@ -23,6 +23,7 @@ const state = {
   selectMode: false,
 };
 
+
 // ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
@@ -192,12 +193,15 @@ function buildTabRow(tab, sleeping) {
   let faviconEl;
   const extensionOrigin = chrome.runtime.getURL('').replace(/\/$/, '');
 
-  // Sleeping tabs show the moon icon; active tabs show the real site favicon
-  // (filtering out the extension icon that Chrome briefly shows while a just-woken
-  // tab is still navigating away from the suspended page).
+  // While a just-woken tab is still navigating away from the suspended page,
+  // Chrome reports the extension icon as favIconUrl and the 💤 title. Parse
+  // the original metadata directly from the suspended page URL hash instead.
+  const transitioning = !sleeping && !!tab.favIconUrl?.startsWith(extensionOrigin);
+  const meta          = transitioning ? parseSuspendedPageMeta(tab.url) : null;
+
   const faviconUrl = sleeping
     ? chrome.runtime.getURL('icons/icon-16.png')
-    : (tab.favIconUrl?.startsWith(extensionOrigin) ? '' : (tab.favIconUrl || ''));
+    : (transitioning ? (meta.favicon || '') : (tab.favIconUrl || ''));
 
   if (faviconUrl) {
     faviconEl = document.createElement('img');
@@ -219,13 +223,13 @@ function buildTabRow(tab, sleeping) {
   title.className = 'tab-title';
   title.textContent = sleeping
     ? (state.registry[tab.id]?.title || tab.title || 'Sleeping tab')
-    : (tab.title || tab.url);
+    : (transitioning ? (meta.title || tab.title || tab.url) : (tab.title || tab.url));
 
   const domain = document.createElement('div');
   domain.className = 'tab-domain';
   domain.textContent = extractDomain(sleeping
     ? (state.registry[tab.id]?.url || '')
-    : (tab.url || ''));
+    : (transitioning ? meta.url : (tab.url || '')));
 
   meta.append(title, domain);
 
@@ -507,6 +511,19 @@ function isSleeping(tab) {
 function extractDomain(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); }
   catch { return ''; }
+}
+
+function parseSuspendedPageMeta(url) {
+  try {
+    const params = new URLSearchParams(new URL(url).hash.slice(1));
+    return {
+      url:     params.get('url')     || '',
+      title:   params.get('title')   || '',
+      favicon: params.get('favicon') || '',
+    };
+  } catch {
+    return { url: '', title: '', favicon: '' };
+  }
 }
 
 function normalizeDomain(raw) {

@@ -70,7 +70,7 @@ window.addEventListener('hashchange', routeFromHash);
 // Config — update before submission
 // ---------------------------------------------------------------------------
 
-const GITHUB_URL = 'https://github.com/DKhanDev/Slumber'; // ExtensionPay short-id
+const GITHUB_URL = 'https://github.com/DKhanDev/Slumber';
 
 // ---------------------------------------------------------------------------
 // Boot
