@@ -101,11 +101,13 @@
     if (!el) return;
 
     try {
-      const res = await chrome.runtime.sendMessage({ type: 'GET_TABS', payload: {} });
-      if (!res?.ok) return;
+      const [tab, res] = await Promise.all([
+        chrome.tabs.getCurrent(),
+        chrome.runtime.sendMessage({ type: 'GET_TABS', payload: {} }),
+      ]);
+      if (!res?.ok || !tab) return;
 
-      // Find the registry entry whose URL matches ours
-      const entry = Object.values(res.registry).find(e => e.url === origUrl);
+      const entry = res.registry[tab.id];
       if (!entry?.suspendedAt) return;
 
       // Initial render

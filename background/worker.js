@@ -51,6 +51,18 @@ async function sweepOrphanedAlarms() {
   );
 }
 
+async function sweepOrphanedRegistry() {
+  const [registry, tabs] = await Promise.all([
+    getSuspendedRegistry(),
+    chrome.tabs.query({}),
+  ]);
+  const tabIds = new Set(tabs.map(t => t.id));
+  const orphaned = Object.keys(registry).filter(id => !tabIds.has(parseInt(id, 10)));
+  if (orphaned.length === 0) return;
+  orphaned.forEach(id => delete registry[id]);
+  await chrome.storage.local.set({ suspended: registry });
+}
+
 // ---------------------------------------------------------------------------
 // ── storage.js ──────────────────────────────────────────────────────────────
 // ---------------------------------------------------------------------------
@@ -228,6 +240,7 @@ async function bootstrapAlarms() {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === SWEEP_ALARM) {
     await sweepOrphanedAlarms();
+    await sweepOrphanedRegistry();
     return;
   }
   if (alarm.name.startsWith(ALARM_PREFIX)) {
@@ -262,6 +275,14 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (!changeInfo.url) return;
+  if (changeInfo.url.startsWith(SUSPENDED_PAGE)) return;
+
+  const registry = await getSuspendedRegistry();
+  if (registry[tabId]) {
+    delete registry[tabId];
+    await chrome.storage.local.set({ suspended: registry });
+  }
+
   const settings = await getSettings();
   if (settings.autoSuspend) await scheduleTabAlarm(tabId, settings.autoSuspendDelay);
 });

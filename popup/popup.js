@@ -33,7 +33,6 @@ const els = {
   tabList:          $('tab-list'),
   emptyState:       $('empty-state'),
   tabSummary:       $('tab-summary'),
-  suspensionCount:  $('suspension-count'),
 
   defaultToolbar:   $('default-toolbar'),
   selectToolbar:    $('select-toolbar'),
@@ -191,9 +190,14 @@ function buildTabRow(tab, sleeping) {
 
   // Favicon
   let faviconEl;
+  const extensionOrigin = chrome.runtime.getURL('').replace(/\/$/, '');
+
+  // Sleeping tabs show the moon icon; active tabs show the real site favicon
+  // (filtering out the extension icon that Chrome briefly shows while a just-woken
+  // tab is still navigating away from the suspended page).
   const faviconUrl = sleeping
-    ? (state.registry[tab.id]?.favicon || '')
-    : (tab.favIconUrl || '');
+    ? chrome.runtime.getURL('icons/icon-16.png')
+    : (tab.favIconUrl?.startsWith(extensionOrigin) ? '' : (tab.favIconUrl || ''));
 
   if (faviconUrl) {
     faviconEl = document.createElement('img');

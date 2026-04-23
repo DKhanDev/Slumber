@@ -77,8 +77,8 @@ body {
 .moon {
   width: 52px;
   height: 52px;
-  color: var(--c-text-3);
   display: block;
+  object-fit: contain;
 }
 
 /* ─── Identity ────────────────────────────────────────────────── */

@@ -88,6 +88,7 @@ async function init() {
   const settingsRes = await msg('GET_SETTINGS');
   if (settingsRes.ok) {
     applySettings(settingsRes.settings, settingsRes.isPro);
+    _whitelist = settingsRes.settings.whitelist ?? [];
   }
 
   bindGeneralEvents();
@@ -151,6 +152,13 @@ async function loadWhitelist() {
   // Lock if not Pro
   const card = $('whitelist-card');
   if (card) card.classList.toggle('pro-locked', !res.isPro);
+
+  // Disable "Clear all" for free users
+  const clearBtn = $('btn-clear-whitelist');
+  if (clearBtn) {
+    clearBtn.disabled = !res.isPro;
+    clearBtn.title = res.isPro ? '' : 'Upgrade to Pro to manage whitelist';
+  }
 }
 
 function renderDomainList() {
@@ -227,6 +235,8 @@ function bindWhitelistEvents() {
     if (e.key === 'Enter') addDomain();
   });
   $('btn-clear-whitelist').addEventListener('click', async () => {
+    const proRes = await msg('GET_SETTINGS');
+    if (!proRes.isPro) return;
     if (!confirm('Clear all whitelisted domains?')) return;
     _whitelist = [];
     renderDomainList();
