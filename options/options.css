@@ -623,3 +623,31 @@ code {
   cursor: pointer;
 }
 .text-link:hover { opacity: 0.8; }
+
+/* ─── License key restore ──────────────────────────────────────── */
+.license-key-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0 18px 4px;
+}
+.license-key-row .text-input {
+  flex: 1;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+}
+.license-key-hint {
+  margin-top: 4px;
+  padding: 0 18px;
+  font-size: 11px;
+  color: var(--c-text-3);
+}
+.license-key-status {
+  margin-top: 6px;
+  padding: 0 18px 8px;
+  font-size: 11px;
+  color: var(--c-text-2);
+}
+.license-key-status.is-error { color: #ef4444; }
+.license-key-status.is-warn  { color: #f59e0b; }
+.license-key-status.is-success { color: #22c55e; }

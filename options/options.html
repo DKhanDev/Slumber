@@ -166,8 +166,12 @@
             </div>
           </div>
           <p class="pro-active-hint" style="margin-top: 12px;">
-            To manage your subscription or transfer to a different account,
-            <a id="link-manage" href="#" class="text-link">sign in to your ExtensionPay account</a>.
+            License key: <code id="pro-txn-id" style="font-size:0.8em; word-break:break-all;">—</code>
+          </p>
+          <p class="pro-active-hint" id="pro-license-email" style="margin-top: 4px;"></p>
+          <p class="pro-active-hint" style="margin-top: 8px;">
+            Your Pro status syncs automatically with your Chrome account. To deactivate on this profile,
+            <a id="link-deactivate" href="#" class="text-link">remove the license</a>.
           </p>
         </div>
 
@@ -180,15 +184,32 @@
             <li>✓ Unlimited suspended tabs</li>
             <li>✓ Bulk select &amp; sleep</li>
             <li>✓ Domain whitelist</li>
-            <li>✓ Cross-device sync via Chrome account</li>
+            <li>✓ Syncs with your Chrome account automatically</li>
           </ul>
           <button class="btn-primary btn-buy" id="btn-upgrade">
-            Upgrade to Pro →
+            Upgrade to Pro — $4.99 →
           </button>
+
+          <!-- License key restore (shown after clicking "Already paid?") -->
           <p class="pro-login-hint">
             Already paid?
-            <a href="#" id="link-login" class="text-link">Sign in to restore access</a>
+            <a href="#" id="link-login" class="text-link">Enter your license key</a>
           </p>
+          <div id="license-key-wrap" hidden>
+            <div class="license-key-row">
+              <input
+                type="text"
+                id="license-key-input"
+                class="text-input"
+                placeholder="XXXX-XXXX-XXXX-XXXX"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="btn-primary" id="btn-activate-key">Activate</button>
+            </div>
+            <p class="license-key-hint">Enter the license key from your receipt email. It looks like <code>XXXX-XXXX-XXXX-XXXX</code>.</p>
+            <p id="license-key-status" class="license-key-status" hidden></p>
+          </div>
         </div>
       </section>
 

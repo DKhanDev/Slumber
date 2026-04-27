@@ -12,7 +12,7 @@
   ],
 
   "host_permissions": [
-    "https://extensionpay.com/*"
+    "https://dkhandev-site-payment-worker.wolf001349.workers.dev/*"
   ],
 
   "background": {
@@ -46,15 +46,7 @@
     }
   ],
 
-  "content_scripts": [
-    {
-      "matches": ["https://extensionpay.com/*"],
-      "js": ["ExtPay.js"],
-      "run_at": "document_start"
-    }
-  ],
-
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src https://extensionpay.com;"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://dkhandev-site-payment-worker.wolf001349.workers.dev;"
   }
 }

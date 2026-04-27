@@ -1,24 +1,10 @@
 /**
  * worker.js — Slumber service worker (classic, non-module)
  *
- * All background modules are inlined here so we can use importScripts()
- * to load ExtPay.js without needing "type":"module" on the service worker.
- * Top-level await is not allowed in service workers — this avoids that entirely.
- *
- * Load order:
- *   1. ExtPay.js       — sets globalThis.ExtPay
- *   2. This file       — uses ExtPay, defines all logic
+ * All background modules are inlined here. No external scripts are loaded.
+ * Payment is handled by Paddle Billing; pro status is stored in
+ * chrome.storage.sync so it follows the user's Chrome account.
  */
-
-importScripts('../ExtPay.js');
-
-// ---------------------------------------------------------------------------
-// ExtPay init — startBackground() called once at top level
-// ---------------------------------------------------------------------------
-
-const EXTPAY_ID = 'slumber-pro';
-const extpay = ExtPay(EXTPAY_ID);
-extpay.startBackground();
 
 // ---------------------------------------------------------------------------
 // ── alarms.js ───────────────────────────────────────────────────────────────
@@ -92,25 +78,48 @@ function defaultSettings() {
 
 // ---------------------------------------------------------------------------
 // ── pro.js ──────────────────────────────────────────────────────────────────
-// MV3 note: top-level extpay goes undefined in callbacks — re-declare inside
-// each function that needs it. startBackground() must only be called once.
+// Pro status is stored in chrome.storage.sync under 'slumber_license':
+//   { licenseKey, valid, email, validatedAt }
+// It syncs automatically across all Chrome instances signed in with the
+// same Google account. The options page writes it after server validation.
 // ---------------------------------------------------------------------------
 
+const LICENSE_VALIDATE_ENDPOINT =
+  'https://dkhandev-site-payment-worker.wolf001349.workers.dev/validate';
+
 async function isPro() {
-  try {
-    const ep = ExtPay(EXTPAY_ID);
-    const user = await ep.getUser();
-    return Boolean(user.paid);
-  } catch (err) {
-    console.warn('[Slumber] ExtPay getUser error — defaulting to false:', err);
-    return false;
-  }
+  const { slumber_license } = await chrome.storage.sync.get('slumber_license');
+  return Boolean(slumber_license?.valid);
 }
 
-function openPaymentPage() {
-  const ep = ExtPay(EXTPAY_ID);
-  ep.openPaymentPage();
+// Re-validates the stored license key on startup. If the server is
+// unreachable the last stored valid state is preserved unchanged.
+async function revalidateLicense() {
+  const { slumber_license } = await chrome.storage.sync.get('slumber_license');
+  if (!slumber_license?.licenseKey) return;
+
+  let data;
+  try {
+    const res = await fetch(
+      `${LICENSE_VALIDATE_ENDPOINT}?key=${encodeURIComponent(slumber_license.licenseKey)}`,
+      { signal: AbortSignal.timeout(10_000) },
+    );
+    if (!res.ok) return; // server error — keep last stored state
+    data = await res.json();
+  } catch {
+    return; // network failure — keep last stored state
+  }
+
+  await chrome.storage.sync.set({
+    slumber_license: {
+      ...slumber_license,
+      valid:       Boolean(data.valid),
+      email:       data.email ?? slumber_license.email,
+      validatedAt: Date.now(),
+    },
+  });
 }
+
 
 // ---------------------------------------------------------------------------
 // ── suspender.js ────────────────────────────────────────────────────────────
@@ -226,7 +235,10 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   await bootstrapAlarms();
 });
 
-chrome.runtime.onStartup.addListener(bootstrapAlarms);
+chrome.runtime.onStartup.addListener(async () => {
+  await bootstrapAlarms();
+  revalidateLicense(); // fire-and-forget; network failures keep last stored state
+});
 
 async function bootstrapAlarms() {
   await chrome.alarms.clear(SWEEP_ALARM);
@@ -354,11 +366,6 @@ async function handleMessage({ type, payload }) {
       } else {
         await Promise.all(tabAlarms.map(a => chrome.alarms.clear(a.name)));
       }
-      return { ok: true };
-    }
-
-    case 'OPEN_PAYMENT_PAGE': {
-      openPaymentPage();
       return { ok: true };
     }
 

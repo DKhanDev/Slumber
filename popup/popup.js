@@ -7,7 +7,7 @@
  *  - Handle select mode (Pro: multi-select + bulk suspend)
  *  - Render free tier meter / Pro status
  *  - Settings panel: read, edit, save
- *  - Pro upgrade: opens ExtensionPay payment page via background message
+ *  - Pro upgrade: opens options/options.html#license in a new tab
  */
 
 // ---------------------------------------------------------------------------
@@ -356,12 +356,11 @@ async function refresh() {
 }
 
 // ---------------------------------------------------------------------------
-// Pro upgrade — delegates to ExtPay via background
+// Pro upgrade — opens the License tab in options
 // ---------------------------------------------------------------------------
 
 function openPaymentPage() {
-  msg('OPEN_PAYMENT_PAGE');
-  // ExtPay opens a tab — close the popup so it doesn't linger
+  chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html#license') });
   window.close();
 }
 
@@ -458,7 +457,7 @@ async function maybeShowWelcome() {
 // ---------------------------------------------------------------------------
 
 function bindEvents() {
-  // Header / footer upgrade buttons → ExtPay
+  // Header / footer upgrade buttons → opens options license tab
   els.btnUpgrade.addEventListener('click', () => { if (!state.isPro) openPaymentPage(); });
   els.btnUpgradeFooter.addEventListener('click', openPaymentPage);
 
