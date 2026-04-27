@@ -35,12 +35,12 @@ Free tier suspends up to 10 tabs concurrently. Pro removes all limits.
 ## Trust & transparency
 
 **Permissions:** `tabs`, `storage`, `alarms`
-**Host permissions:** `*.paddle.com` only — used for the Paddle checkout iframe when you upgrade to Pro
+**Host permissions:** `dkhandev-site-payment-worker.workers.dev` — used solely to validate your Pro license key at activation and silently on browser startup
 **Telemetry:** none
-**Network:** the only external connections are to `paddle.com` when the Paddle checkout is open. No background calls, never triggered by browsing activity, never transmitting tab data
+**Network:** the only external connection is a single GET request to the license validation endpoint, containing only your license key. It is never triggered by browsing activity and never transmits tab data
 **Data:** your tab URLs, titles, and favicons never leave your device
 **Payments:** handled entirely by Paddle — Slumber never sees your card details or email
-**Pro license:** stored in `chrome.storage.sync` and syncs automatically across all Chrome instances signed in to your Google account
+**Pro license:** a `XXXX-XXXX-XXXX-XXXX` key issued at purchase. Enter it once in Options → License. It is stored in `chrome.storage.sync` and syncs automatically across all Chrome instances signed in to your Google account. On a fresh profile, enter the same key again to restore access
 
 Most competing tab suspenders request `<all_urls>` host access and additional permissions like `webNavigation` or `history`. Slumber requests none of these. Every permission and network call in this list is verifiable by reading the source.
 
@@ -59,8 +59,6 @@ Slumber was built to fill that gap — on Manifest V3 (the current Chrome extens
 ```
 slumber/
 ├── manifest.json
-├── vendor/
-│   └── paddle.js           # Paddle Billing JS v2 (bundled, not remote)
 ├── icons/
 │   └── icon-{16,32,48,128}.png
 ├── background/
@@ -88,9 +86,9 @@ slumber/
 
 **Manifest V3.** The extension is built entirely on MV3. No MV2 APIs or patterns are used.
 
-**No remote code.** `vendor/paddle.js` is bundled inside the extension zip. No scripts are fetched and executed at runtime. The Paddle checkout overlay is an iframe loaded from `paddle.com` — it is sandboxed and never runs in the extension context.
+**No remote code.** No scripts are fetched or executed at runtime. The only outbound request the extension makes is the license key validation GET call — it carries no browsing data.
 
-**Pro license via Chrome Sync.** After purchase, the Paddle transaction ID is stored in `chrome.storage.sync`. Chrome syncs it across every signed-in browser automatically — no server or additional calls needed. Users on a fresh profile can restore access by entering their `txn_...` transaction ID from their Paddle receipt email.
+**Pro license via Chrome Sync.** After purchase, your `XXXX-XXXX-XXXX-XXXX` license key is validated against a Cloudflare Worker and the result stored in `chrome.storage.sync`. Chrome syncs it across every signed-in browser automatically. On startup the key is silently re-validated; if the server is unreachable, the last stored valid state is preserved. Users on a fresh profile can restore access by entering the same key from their purchase receipt.
 
 **Tab metadata privacy.** URLs, titles, and favicons are encoded into the URL hash of the suspended page (`suspended.html#url=...&title=...&favicon=...`) and stored in `chrome.storage.local` for the duration of the suspension only. They are deleted the moment the tab wakes. They are never transmitted.
 
