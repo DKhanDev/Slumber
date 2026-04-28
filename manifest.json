@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Slumber — Tab Suspender",
   "short_name": "Slumber",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Suspend inactive tabs to reclaim memory. Lightweight, private, no telemetry.",
 
   "permissions": [
