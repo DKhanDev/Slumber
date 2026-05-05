@@ -46,6 +46,21 @@ Most competing tab suspenders request `<all_urls>` host access and additional pe
 
 ---
 
+## What happens when a tab wakes
+
+Waking a tab navigates to the original URL — the same as typing it into the address bar and pressing Enter. This frees Slumber from needing broad permissions, but it means the page reloads from scratch:
+
+- **Unsaved form input is lost.** Anything typed but not submitted will be gone.
+- **Videos restart from the beginning.** YouTube, Vimeo, and similar sites won't resume at your position.
+- **Scroll position resets.** The page opens at the top.
+- **In-progress flows reset.** If a single-page app was mid-checkout or mid-wizard, it restarts.
+- **Login sessions are unaffected.** Cookies persist; you stay signed in.
+- **Page load is often fast.** Static assets are served from cache, and sites like Google Docs restore their state from the server.
+
+The short version: treat a suspended tab like a bookmark. If you're mid-way through something important, finish it before the suspension timer fires — or whitelist that domain (Pro).
+
+---
+
 ## Why Slumber exists
 
 The Great Suspender was removed from the Chrome Web Store in February 2021 after its new owners pushed an update containing malware. Over two million users were left without a trusted tab suspender.
