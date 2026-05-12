@@ -16,7 +16,7 @@
     </div>
     <div class="header-actions">
       <button id="btn-upgrade" class="badge badge-free" aria-label="Upgrade to Pro">
-        Free <span class="badge-count">0/10</span>
+        Free
       </button>
       <button id="btn-help" class="icon-btn" aria-label="Help & FAQ" title="Help">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
@@ -75,20 +75,10 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <!-- Free tier meter -->
-    <div class="meter-wrap" id="meter-wrap">
-      <div class="meter-track" role="progressbar" aria-label="Suspended tabs" aria-valuenow="0" aria-valuemin="0" aria-valuemax="10">
-        <div class="meter-fill" id="meter-fill"></div>
-      </div>
-      <span class="meter-label" id="meter-label">0 / 10 sleeping</span>
-    </div>
-
-    <!-- Pro: no meter, just a quiet status -->
-    <div class="pro-status" id="pro-status" hidden>
+    <div class="footer-status" id="footer-status">
       <img src="../icons/icon-16.png" width="11" height="11" alt="" aria-hidden="true" style="opacity:0.5;" />
-      <span id="pro-sleeping-count">0 sleeping</span>
+      <span id="footer-sleeping-count">0 sleeping</span>
     </div>
-
     <button id="btn-upgrade-footer" class="upgrade-btn" aria-label="Upgrade to Pro">
       Upgrade to Pro →
     </button>
@@ -150,6 +140,17 @@
         </label>
       </div>
 
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label" for="toggle-capturing">Suspend tabs using microphone or camera</label>
+          <span class="setting-hint">Off by default — never interrupt calls or recordings</span>
+        </div>
+        <label class="toggle" aria-label="Toggle media-capturing tab suspension">
+          <input type="checkbox" id="toggle-capturing" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+
       <div class="setting-divider"></div>
 
       <!-- Pro-only settings -->
@@ -176,6 +177,27 @@
           <input type="checkbox" id="toggle-sync" />
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
         </label>
+      </div>
+
+      <div class="setting-divider"></div>
+
+      <div class="setting-row" id="row-schedule">
+        <div class="setting-info">
+          <label class="setting-label" for="toggle-schedule">Suspension schedule <span class="pro-chip">Pro</span></label>
+          <span class="setting-hint" id="schedule-hint">Only suspend during set hours</span>
+        </div>
+        <label class="toggle" aria-label="Toggle suspension schedule">
+          <input type="checkbox" id="toggle-schedule" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Keyboard shortcuts</span>
+          <span class="setting-hint">Sleep · Wake · Wake all</span>
+        </div>
+        <button id="btn-open-shortcuts" class="text-btn">Manage →</button>
       </div>
 
     </div>

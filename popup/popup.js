@@ -45,16 +45,12 @@ const els = {
   btnSelectNone:    $('btn-select-none'),
   btnSleepSelected: $('btn-sleep-selected'),
 
-  btnUpgrade:       $('btn-upgrade'),
-  btnUpgradeFooter: $('btn-upgrade-footer'),
-  btnHelp:          $('btn-help'),
-  btnSettings:      $('btn-settings'),
+  btnUpgrade:          $('btn-upgrade'),
+  btnUpgradeFooter:    $('btn-upgrade-footer'),
+  btnHelp:             $('btn-help'),
+  btnSettings:         $('btn-settings'),
 
-  meterWrap:        $('meter-wrap'),
-  meterFill:        $('meter-fill'),
-  meterLabel:       $('meter-label'),
-  proStatus:        $('pro-status'),
-  proSleepingCount: $('pro-sleeping-count'),
+  footerSleepingCount: $('footer-sleeping-count'),
 
   settingsPanel:    $('settings-panel'),
   btnCloseSettings: $('btn-close-settings'),
@@ -65,8 +61,13 @@ const els = {
   rowDelay:         $('row-delay'),
   togglePinned:     $('toggle-pinned'),
   toggleAudible:    $('toggle-audible'),
+  toggleCapturing:  $('toggle-capturing'),
   toggleSync:       $('toggle-sync'),
   rowSync:          $('row-sync'),
+  toggleSchedule:   $('toggle-schedule'),
+  rowSchedule:      $('row-schedule'),
+  scheduleHint:     $('schedule-hint'),
+  btnOpenShortcuts: $('btn-open-shortcuts'),
 
   whitelistWrap:    $('whitelist-wrap'),
   whitelistTags:    $('whitelist-tags'),
@@ -108,11 +109,12 @@ function renderHeader() {
   const badge = els.btnUpgrade;
   if (state.isPro) {
     badge.textContent = 'Pro ✓';
+    badge.setAttribute('aria-label', 'Slumber Pro active');
     badge.classList.remove('badge-free');
     badge.classList.add('badge-pro');
   } else {
-    const sleeping = Object.keys(state.registry).length;
-    badge.innerHTML = `Free <span class="badge-count">${sleeping}/10</span>`;
+    badge.textContent = 'Free';
+    badge.setAttribute('aria-label', 'Upgrade to Pro');
   }
 }
 
@@ -149,21 +151,8 @@ function renderTabList() {
 
 function renderFooter() {
   const sleepingCount = Object.keys(state.registry).length;
-
-  if (state.isPro) {
-    els.meterWrap.hidden        = true;
-    els.proStatus.hidden        = false;
-    els.btnUpgradeFooter.hidden = true;
-    els.proSleepingCount.textContent = `${sleepingCount} sleeping`;
-  } else {
-    els.meterWrap.hidden        = false;
-    els.proStatus.hidden        = true;
-    els.btnUpgradeFooter.hidden = false;
-
-    const pct = Math.min(sleepingCount / 10, 1) * 100;
-    els.meterFill.style.width  = `${pct}%`;
-    els.meterLabel.textContent = `${sleepingCount} / 10 sleeping`;
-  }
+  els.footerSleepingCount.textContent = `${sleepingCount} sleeping`;
+  els.btnUpgradeFooter.hidden = state.isPro;
 }
 
 function renderSelectToolbar() {
@@ -370,18 +359,21 @@ function openPaymentPage() {
 
 function openSettings() {
   const s = state.settings;
-  els.toggleAuto.checked    = s.autoSuspend ?? true;
-  els.inputDelay.value      = s.autoSuspendDelay ?? 30;
-  els.togglePinned.checked  = s.suspendPinned ?? false;
-  els.toggleAudible.checked = s.suspendAudible ?? false;
-  els.toggleSync.checked    = s.syncSettings ?? false;
+  els.toggleAuto.checked       = s.autoSuspend      ?? true;
+  els.inputDelay.value         = s.autoSuspendDelay ?? 30;
+  els.togglePinned.checked     = s.suspendPinned    ?? false;
+  els.toggleAudible.checked    = s.suspendAudible   ?? false;
+  els.toggleCapturing.checked  = s.suspendCapturing ?? false;
+  els.toggleSync.checked       = s.syncSettings     ?? false;
+  els.toggleSchedule.checked   = s.schedule?.enabled ?? false;
+  els.scheduleHint.textContent = scheduleWindowText(s.schedule);
 
   els.rowDelay.hidden = !els.toggleAuto.checked;
 
   renderWhitelistTags(s.whitelist ?? []);
 
   // Lock Pro-only rows for free users
-  const proRows = [els.whitelistWrap, els.rowSync];
+  const proRows = [els.whitelistWrap, els.rowSync, els.rowSchedule];
   proRows.forEach(el => {
     el.classList.toggle('pro-locked', !state.isPro);
   });
@@ -399,12 +391,15 @@ async function saveSettings() {
     .filter(Boolean);
 
   const settings = {
+    ...state.settings,
     autoSuspend:      els.toggleAuto.checked,
     autoSuspendDelay: Math.max(1, parseInt(els.inputDelay.value, 10) || 30),
     suspendPinned:    els.togglePinned.checked,
     suspendAudible:   els.toggleAudible.checked,
+    suspendCapturing: els.toggleCapturing.checked,
     whitelist,
     syncSettings:     els.toggleSync.checked,
+    schedule: { ...(state.settings.schedule ?? {}), enabled: els.toggleSchedule.checked },
   };
 
   const res = await msg('SAVE_SETTINGS', { settings });
@@ -481,6 +476,11 @@ function bindEvents() {
   els.btnSelectNone.addEventListener('click', exitSelectMode);
   els.btnSleepSelected.addEventListener('click', sleepSelected);
 
+  els.btnOpenShortcuts.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html#shortcuts') });
+    window.close();
+  });
+
   // Settings
   els.btnCloseSettings.addEventListener('click', closeSettings);
   els.btnSaveSettings.addEventListener('click', saveSettings);
@@ -523,6 +523,13 @@ function parseSuspendedPageMeta(url) {
   } catch {
     return { url: '', title: '', favicon: '' };
   }
+}
+
+function scheduleWindowText(schedule) {
+  if (!schedule?.enabled) return 'Only suspend during set hours';
+  const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days = (schedule.days ?? []).map(d => DAY[d]).join(', ') || 'No days';
+  return `${days} · ${schedule.startTime ?? '09:00'}–${schedule.endTime ?? '18:00'}`;
 }
 
 function normalizeDomain(raw) {

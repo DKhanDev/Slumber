@@ -10,8 +10,9 @@
 // ── alarms.js ───────────────────────────────────────────────────────────────
 // ---------------------------------------------------------------------------
 
-const ALARM_PREFIX = 'slumber-tab-';
-const SWEEP_ALARM  = 'slumber-sweep';
+const ALARM_PREFIX    = 'slumber-tab-';
+const SWEEP_ALARM     = 'slumber-sweep';
+const SCHEDULE_ALARM  = 'slumber-schedule-window';
 
 async function scheduleTabAlarm(tabId, delayInMinutes) {
   const alarmName = `${ALARM_PREFIX}${tabId}`;
@@ -49,11 +50,44 @@ async function sweepOrphanedRegistry() {
   await chrome.storage.local.set({ suspended: registry });
 }
 
+// Returns true when auto-suspend is allowed at the current moment.
+// Always returns true if no schedule is configured or it is disabled.
+function isWithinSchedule(schedule) {
+  if (!schedule?.enabled) return true;
+  const now = new Date();
+  if (!Array.isArray(schedule.days) || !schedule.days.includes(now.getDay())) return false;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const [sh, sm] = (schedule.startTime ?? '09:00').split(':').map(Number);
+  const [eh, em] = (schedule.endTime   ?? '18:00').split(':').map(Number);
+  const start = sh * 60 + sm;
+  const end   = eh * 60 + em;
+  if (end <= start) return false;
+  return nowMin >= start && nowMin < end;
+}
+
+// Sets (or clears) a one-shot alarm that fires at the next scheduled window
+// start. When it fires we reschedule all tab alarms so suspension kicks in.
+async function scheduleWindowAlarm(schedule) {
+  await chrome.alarms.clear(SCHEDULE_ALARM);
+  if (!schedule?.enabled || !Array.isArray(schedule.days) || !schedule.days.length) return;
+
+  const [sh, sm] = (schedule.startTime ?? '09:00').split(':').map(Number);
+  const now = new Date();
+  for (let d = 0; d <= 7; d++) {
+    const candidate = new Date(now);
+    candidate.setDate(now.getDate() + d);
+    candidate.setHours(sh, sm, 0, 0);
+    if (candidate > now && schedule.days.includes(candidate.getDay())) {
+      const delayMs = candidate.getTime() - now.getTime();
+      await chrome.alarms.create(SCHEDULE_ALARM, { delayInMinutes: delayMs / 60_000 });
+      return;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // ── storage.js ──────────────────────────────────────────────────────────────
 // ---------------------------------------------------------------------------
-
-const FREE_TIER_LIMIT = 10;
 
 async function getSettings() {
   const { settings } = await chrome.storage.local.get('settings');
@@ -67,12 +101,19 @@ async function getSuspendedRegistry() {
 
 function defaultSettings() {
   return {
-    autoSuspend:      true,
-    autoSuspendDelay: 30,
-    suspendPinned:    false,
-    suspendAudible:   false,
-    whitelist:        [],
-    syncSettings:     false,
+    autoSuspend:       true,
+    autoSuspendDelay:  30,
+    suspendPinned:     false,
+    suspendAudible:    false,
+    suspendCapturing:  false,
+    whitelist:         [],
+    syncSettings:      false,
+    schedule: {
+      enabled:   false,
+      days:      [1, 2, 3, 4, 5],
+      startTime: '09:00',
+      endTime:   '18:00',
+    },
   };
 }
 
@@ -135,14 +176,6 @@ async function suspendTab(tabId, opts = {}) {
   if (opts.source === 'auto' && tab.active) return;
   if (await isExempt(tab)) return;
 
-  if (!await isPro()) {
-    const registry = await getSuspendedRegistry();
-    if (Object.keys(registry).length >= FREE_TIER_LIMIT) {
-      console.info(`[Slumber] Free tier limit (${FREE_TIER_LIMIT}) reached. Skipping tab ${tabId}.`);
-      return;
-    }
-  }
-
   const entry = {
     url:         tab.url,
     title:       tab.title || tab.url,
@@ -187,11 +220,21 @@ function isSlumberPage(url = '') {
   return url.startsWith(SUSPENDED_PAGE);
 }
 
+// tabId → Set<frameId> for frames that currently have an active media capture.
+// Populated by SET_CAPTURE_STATE messages from content/media-relay.js.
+const _capturingFrames = new Map();
+
+function isTabCapturing(tabId) {
+  const frames = _capturingFrames.get(tabId);
+  return frames !== undefined && frames.size > 0;
+}
+
 async function isExempt(tab) {
   const settings = await getSettings();
 
-  if (tab.pinned && !settings.suspendPinned) return true;
-  if (tab.audible && !settings.suspendAudible) return true;
+  if (tab.pinned    && !settings.suspendPinned)    return true;
+  if (tab.audible   && !settings.suspendAudible)   return true;
+  if (isTabCapturing(tab.id) && !settings.suspendCapturing) return true;
 
   if (!tab.url
     || tab.url.startsWith('chrome://')
@@ -243,6 +286,10 @@ chrome.runtime.onStartup.addListener(async () => {
 async function bootstrapAlarms() {
   await chrome.alarms.clear(SWEEP_ALARM);
   await chrome.alarms.create(SWEEP_ALARM, { periodInMinutes: SWEEP_INTERVAL });
+  if (await isPro()) {
+    const settings = await getSettings();
+    await scheduleWindowAlarm(settings.schedule);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +302,15 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     await sweepOrphanedRegistry();
     return;
   }
+  if (alarm.name === SCHEDULE_ALARM) {
+    const [settings, pro] = await Promise.all([getSettings(), isPro()]);
+    if (pro && settings.autoSuspend && isWithinSchedule(settings.schedule)) {
+      const tabs = await chrome.tabs.query({});
+      await Promise.all(tabs.map(t => scheduleTabAlarm(t.id, settings.autoSuspendDelay)));
+    }
+    if (pro) await scheduleWindowAlarm(settings.schedule);
+    return;
+  }
   if (alarm.name.startsWith(ALARM_PREFIX)) {
     const tabId = parseInt(alarm.name.slice(ALARM_PREFIX.length), 10);
     await handleAutoSuspend(tabId);
@@ -264,6 +320,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 async function handleAutoSuspend(tabId) {
   const settings = await getSettings();
   if (!settings.autoSuspend) return;
+  if (await isPro() && !isWithinSchedule(settings.schedule)) return;
 
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   if (!tab) return;
@@ -289,6 +346,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (!changeInfo.url) return;
   if (changeInfo.url.startsWith(SUSPENDED_PAGE)) return;
 
+  // Navigation invalidates any previously tracked capture state for this tab.
+  _capturingFrames.delete(tabId);
+
   const registry = await getSuspendedRegistry();
   if (registry[tabId]) {
     delete registry[tabId];
@@ -300,6 +360,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
+  _capturingFrames.delete(tabId);
   await clearTabAlarm(tabId);
   const registry = await getSuspendedRegistry();
   if (registry[tabId]) {
@@ -309,11 +370,34 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 });
 
 // ---------------------------------------------------------------------------
+// Keyboard shortcut commands
+// ---------------------------------------------------------------------------
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'unsuspend-all-tabs') {
+    const registry = await getSuspendedRegistry();
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const sleeping = tabs.filter(t => registry[t.id]);
+    await Promise.all(sleeping.map(t => unsuspendTab(t.id)));
+    return;
+  }
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab) return;
+
+  if (command === 'suspend-tab' && !isSlumberPage(tab.url)) {
+    await suspendTab(tab.id, { source: 'manual' });
+  } else if (command === 'unsuspend-tab' && isSlumberPage(tab.url)) {
+    await unsuspendTab(tab.id);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Message router
 // ---------------------------------------------------------------------------
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  handleMessage(message)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  handleMessage(message, sender)
     .then(sendResponse)
     .catch(err => {
       console.error('[Slumber worker] message error:', err);
@@ -322,8 +406,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-async function handleMessage({ type, payload }) {
+async function handleMessage({ type, payload }, sender = {}) {
   switch (type) {
+
+    case 'SET_CAPTURE_STATE': {
+      const tabId   = sender.tab?.id;
+      const frameId = sender.frameId ?? 0;
+      if (tabId == null) return { ok: true };
+
+      if (!_capturingFrames.has(tabId)) _capturingFrames.set(tabId, new Set());
+      const frames = _capturingFrames.get(tabId);
+      if (payload.capturing) {
+        frames.add(frameId);
+      } else {
+        frames.delete(frameId);
+        if (frames.size === 0) _capturingFrames.delete(tabId);
+      }
+      return { ok: true };
+    }
 
     case 'SUSPEND_TAB': {
       await suspendTab(payload.tabId, { source: 'manual' });
@@ -358,6 +458,7 @@ async function handleMessage({ type, payload }) {
     case 'SAVE_SETTINGS': {
       const { settings } = payload;
       await chrome.storage.local.set({ settings });
+      if (await isPro()) await scheduleWindowAlarm(settings.schedule);
       const alarms = await chrome.alarms.getAll();
       const tabAlarms = alarms.filter(a => a.name.startsWith(ALARM_PREFIX));
       if (settings.autoSuspend) {

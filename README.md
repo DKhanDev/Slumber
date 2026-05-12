@@ -10,7 +10,7 @@ Suspend inactive tabs to free up memory and CPU. Restore them instantly with one
 
 When a tab has been idle for a configurable period, Slumber replaces it with a lightweight sleeping page that preserves the title, favicon, and original URL. The tab takes up no memory and no CPU until you wake it. One click or keypress restores it exactly where you left off.
 
-Free tier suspends up to 10 tabs concurrently. Pro removes all limits.
+All features are available on the free tier. Pro adds bulk select, domain whitelist, and cross-device sync.
 
 ---
 
@@ -21,11 +21,14 @@ Free tier suspends up to 10 tabs concurrently. Pro removes all limits.
 | Auto-suspend by timer | ✓ | ✓ |
 | Manual suspend (one tab) | ✓ | ✓ |
 | Sleep all / wake all | ✓ | ✓ |
+| Keyboard shortcuts (sleep / wake) | ✓ | ✓ |
 | Never suspend pinned tabs | ✓ | ✓ |
 | Never suspend audible tabs | ✓ | ✓ |
-| Suspended tab limit | 10 tabs | Unlimited |
+| Never suspend tabs using mic or camera | ✓ | ✓ |
+| Unlimited suspended tabs | ✓ | ✓ |
 | Bulk select & suspend | — | ✓ |
 | Domain whitelist | — | ✓ |
+| Suspension schedule | — | ✓ |
 | Cross-device settings sync | — | ✓ |
 
 **Pro is $4.99 one-time** via Paddle. No subscription, no renewal.
@@ -35,14 +38,15 @@ Free tier suspends up to 10 tabs concurrently. Pro removes all limits.
 ## Trust & transparency
 
 **Permissions:** `tabs`, `storage`, `alarms`
-**Host permissions:** `dkhandev-site-payment-worker.workers.dev` — used solely to validate your Pro license key at activation and silently on browser startup
+**Host permissions:** `<all_urls>` — required to inject the microphone/camera detection script into pages. The injected script (`content/media-monitor.js`) only wraps `getUserMedia` and `getDisplayMedia`; it reads no page content and transmits nothing. `dkhandev-site-payment-worker.workers.dev` — used solely to validate your Pro license key
+**Content scripts:** two small scripts injected at `document_start` into all pages. One runs in the page's JavaScript context (MAIN world) to detect active media capture; the other relays the state to the background. Neither reads tab content or URLs
 **Telemetry:** none
 **Network:** the only external connection is a single GET request to the license validation endpoint, containing only your license key. It is never triggered by browsing activity and never transmits tab data
 **Data:** your tab URLs, titles, and favicons never leave your device
 **Payments:** handled entirely by Paddle — Slumber never sees your card details or email
 **Pro license:** a `XXXX-XXXX-XXXX-XXXX` key issued at purchase. Enter it once in Options → License. It is stored in `chrome.storage.sync` and syncs automatically across all Chrome instances signed in to your Google account. On a fresh profile, enter the same key again to restore access
 
-Most competing tab suspenders request `<all_urls>` host access and additional permissions like `webNavigation` or `history`. Slumber requests none of these. Every permission and network call in this list is verifiable by reading the source.
+Every permission and content script in this list is verifiable by reading the source.
 
 ---
 
@@ -111,11 +115,11 @@ slumber/
 
 ## Roadmap
 
-**v1.1 — Suspension schedule**
-Define time windows during which auto-suspend is active. Example: only suspend tabs between 9am–6pm on weekdays.
-
 **v1.2 — Per-tab rules**
 Set individual tab behaviour — never suspend a specific tab regardless of domain, or always suspend a specific tab immediately.
+
+**v1.3 - Session snapshots/suspension groups**
+Save a named group of tabs and restore them later.
 
 ---
 

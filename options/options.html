@@ -19,6 +19,8 @@
 
       <ul class="nav-list" role="list">
         <li><a class="nav-item active" href="#general"   data-section="general">General</a></li>
+        <li><a class="nav-item"        href="#shortcuts" data-section="shortcuts">Shortcuts</a></li>
+        <li><a class="nav-item"        href="#schedule"  data-section="schedule">Schedule</a></li>
         <li><a class="nav-item"        href="#whitelist" data-section="whitelist">Whitelist</a></li>
         <li><a class="nav-item"        href="#license"   data-section="license">License</a></li>
         <li><a class="nav-item"        href="#stats"     data-section="stats">Stats</a></li>
@@ -40,7 +42,7 @@
           <span class="welcome-card-moon">🌙</span>
           <div>
             <p class="welcome-card-title">Welcome to Slumber</p>
-            <p class="welcome-card-body">You're all set. Tabs will automatically sleep after 30 minutes of inactivity. Adjust the timer below, set up a whitelist, or upgrade to Pro for unlimited suspensions.</p>
+            <p class="welcome-card-body">You're all set. Tabs will automatically sleep after 30 minutes of inactivity. Adjust the timer below, or upgrade to Pro for bulk select, domain whitelist, and suspension schedule.</p>
           </div>
         </div>
         <button class="welcome-card-dismiss" id="welcome-card-dismiss">Got it</button>
@@ -93,6 +95,17 @@
               <span class="toggle-track"><span class="toggle-thumb"></span></span>
             </label>
           </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="toggle-capturing">Suspend tabs using microphone or camera</label>
+              <p class="setting-hint">Off by default — enabling this may interrupt active calls or recordings.</p>
+            </div>
+            <label class="toggle" aria-label="Toggle media-capturing tab suspension">
+              <input type="checkbox" id="toggle-capturing" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
         </div>
 
         <div class="card" id="card-sync">
@@ -114,6 +127,75 @@
         <div class="action-row">
           <button class="btn-primary" id="btn-save-general">Save changes</button>
           <span class="save-confirm" id="save-confirm-general" hidden>Saved ✓</span>
+        </div>
+      </section>
+
+      <!-- ── Shortcuts ─────────────────────────────────────────── -->
+      <section class="section" id="section-shortcuts" aria-labelledby="h-shortcuts" hidden>
+        <h1 class="section-title" id="h-shortcuts">Keyboard Shortcuts</h1>
+        <p class="section-desc">
+          Shortcuts are set in Chrome and apply globally while the browser is open.
+          Default keys are assigned on a fresh install — if you see "Not set" after
+          updating the extension, use the button below to assign them.
+        </p>
+
+        <div class="card" id="shortcuts-card">
+          <!-- Populated by options.js -->
+        </div>
+
+        <div class="action-row" style="margin-top: 16px;">
+          <button class="btn-primary" id="btn-edit-shortcuts">Edit shortcuts in Chrome →</button>
+        </div>
+      </section>
+
+      <!-- ── Schedule ──────────────────────────────────────────── -->
+      <section class="section" id="section-schedule" aria-labelledby="h-schedule" hidden>
+        <div class="section-title-row">
+          <h1 class="section-title" id="h-schedule">Schedule</h1>
+          <span class="pro-chip">Pro</span>
+        </div>
+        <p class="section-desc">Define a time window during which auto-suspend is active. Outside the window, tabs will not be automatically suspended.</p>
+
+        <div class="card" id="schedule-card">
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="toggle-schedule">Enable suspension schedule</label>
+              <p class="setting-hint">Only auto-suspend tabs during the time window below.</p>
+            </div>
+            <label class="toggle" aria-label="Toggle suspension schedule">
+              <input type="checkbox" id="toggle-schedule" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div id="schedule-config" hidden>
+            <div class="setting-row indent">
+              <label class="setting-label">Active days</label>
+              <div class="day-picker" id="day-picker" role="group" aria-label="Active days">
+                <button type="button" class="day-btn" data-day="0">Sun</button>
+                <button type="button" class="day-btn" data-day="1">Mon</button>
+                <button type="button" class="day-btn" data-day="2">Tue</button>
+                <button type="button" class="day-btn" data-day="3">Wed</button>
+                <button type="button" class="day-btn" data-day="4">Thu</button>
+                <button type="button" class="day-btn" data-day="5">Fri</button>
+                <button type="button" class="day-btn" data-day="6">Sat</button>
+              </div>
+            </div>
+
+            <div class="setting-row indent">
+              <label class="setting-label">Active window</label>
+              <div class="time-range-wrap">
+                <input type="time" id="input-start-time" class="time-input" value="09:00" />
+                <span class="time-sep">to</span>
+                <input type="time" id="input-end-time" class="time-input" value="18:00" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn-primary" id="btn-save-schedule">Save changes</button>
+          <span class="save-confirm" id="save-confirm-schedule" hidden>Saved ✓</span>
         </div>
       </section>
 
@@ -163,7 +245,7 @@
             <div class="pro-badge-large">Pro</div>
             <div>
               <p class="pro-active-title">Slumber Pro is active</p>
-              <p class="pro-active-hint">Unlimited tab suspensions, bulk select, domain whitelist, and cross-device sync are all enabled.</p>
+              <p class="pro-active-hint">Bulk select, domain whitelist, suspension schedule, and cross-device sync are all enabled.</p>
             </div>
           </div>
           <p class="pro-active-hint" style="margin-top: 12px;">
@@ -179,13 +261,13 @@
         <!-- Free state -->
         <div class="card" id="free-card">
           <p class="free-desc">
-            Slumber Pro unlocks unlimited tab suspension, bulk select, domain whitelist, and cross-device sync — for a one-time payment of <strong>$4.99</strong>.
+            Slumber Pro unlocks bulk select, domain whitelist, suspension schedule, and cross-device sync — for a one-time payment of <strong>$4.99</strong>.
           </p>
           <ul class="pro-features-list">
-            <li>✓ Unlimited suspended tabs</li>
-            <li>✓ Bulk select &amp; sleep</li>
+            <li>✓ Bulk select &amp; sleep tabs</li>
             <li>✓ Domain whitelist</li>
-            <li>✓ Syncs with your Chrome account automatically</li>
+            <li>✓ Suspension schedule</li>
+            <li>✓ Syncs settings with your Chrome account automatically</li>
           </ul>
           <button class="btn-primary btn-buy" id="btn-upgrade">
             Upgrade to Pro — $4.99 →

@@ -61,6 +61,8 @@ function activateSection(name) {
   if (name === 'stats')     loadStats();
   if (name === 'license')   loadLicense();
   if (name === 'whitelist') loadWhitelist();
+  if (name === 'schedule')  loadSchedule();
+  if (name === 'shortcuts') loadShortcuts();
 }
 
 navItems.forEach(a => {
@@ -73,7 +75,7 @@ navItems.forEach(a => {
 // Handle direct hash navigation (e.g. chrome opens options to #license)
 function routeFromHash() {
   const hash = location.hash.slice(1);
-  const valid = ['general', 'whitelist', 'license', 'stats'];
+  const valid = ['general', 'shortcuts', 'schedule', 'whitelist', 'license', 'stats'];
   activateSection(valid.includes(hash) ? hash : 'general');
 }
 window.addEventListener('hashchange', routeFromHash);
@@ -107,6 +109,8 @@ async function init() {
   }
 
   bindGeneralEvents();
+  bindShortcutsEvents();
+  bindScheduleEvents();
   bindWhitelistEvents();
   bindLicenseEvents();
   bindStatsEvents();
@@ -120,11 +124,12 @@ async function init() {
 // ---------------------------------------------------------------------------
 
 function applySettings(settings, isPro) {
-  $('toggle-auto').checked    = settings.autoSuspend    ?? true;
-  $('input-delay').value      = settings.autoSuspendDelay ?? 30;
-  $('toggle-pinned').checked  = settings.suspendPinned  ?? false;
-  $('toggle-audible').checked = settings.suspendAudible ?? false;
-  $('toggle-sync').checked    = settings.syncSettings   ?? false;
+  $('toggle-auto').checked       = settings.autoSuspend      ?? true;
+  $('input-delay').value         = settings.autoSuspendDelay ?? 30;
+  $('toggle-pinned').checked     = settings.suspendPinned    ?? false;
+  $('toggle-audible').checked    = settings.suspendAudible   ?? false;
+  $('toggle-capturing').checked  = settings.suspendCapturing ?? false;
+  $('toggle-sync').checked       = settings.syncSettings     ?? false;
 
   $('row-delay').hidden = !$('toggle-auto').checked;
 
@@ -139,11 +144,15 @@ function bindGeneralEvents() {
   });
 
   $('btn-save-general').addEventListener('click', async () => {
+    const currentRes = await msg('GET_SETTINGS');
+    const current = currentRes.ok ? currentRes.settings : {};
     const settings = {
+      ...current,
       autoSuspend:      $('toggle-auto').checked,
       autoSuspendDelay: Math.max(1, parseInt($('input-delay').value, 10) || 30),
       suspendPinned:    $('toggle-pinned').checked,
       suspendAudible:   $('toggle-audible').checked,
+      suspendCapturing: $('toggle-capturing').checked,
       syncSettings:     $('toggle-sync').checked,
       whitelist:        await getCurrentWhitelist(),
     };
@@ -151,6 +160,131 @@ function bindGeneralEvents() {
     const res = await msg('SAVE_SETTINGS', { settings });
     if (res.ok) showSaveConfirm('save-confirm-general');
   });
+}
+
+// ---------------------------------------------------------------------------
+// Shortcuts
+// ---------------------------------------------------------------------------
+
+const SHORTCUT_LABELS = {
+  '_execute_action':   'Open Slumber popup',
+  'suspend-tab':       'Sleep the current tab',
+  'unsuspend-tab':     'Wake the current tab',
+  'unsuspend-all-tabs':'Wake all sleeping tabs in the current window',
+};
+
+async function loadShortcuts() {
+  const commands = await chrome.commands.getAll();
+  const card     = $('shortcuts-card');
+  if (!card) return;
+
+  card.innerHTML = '';
+
+  commands.forEach(cmd => {
+    const label   = SHORTCUT_LABELS[cmd.name] ?? cmd.description ?? cmd.name;
+    const binding = cmd.shortcut || null;
+
+    const row = document.createElement('div');
+    row.className = 'setting-row shortcut-row';
+
+    const info = document.createElement('span');
+    info.className   = 'setting-label';
+    info.textContent = label;
+
+    const badge = document.createElement('div');
+    badge.className = 'shortcut-badge';
+
+    if (binding) {
+      binding.split('+').forEach((part, i) => {
+        if (i > 0) {
+          const sep = document.createElement('span');
+          sep.className   = 'shortcut-sep';
+          sep.textContent = '+';
+          badge.appendChild(sep);
+        }
+        const key = document.createElement('kbd');
+        key.textContent = part.trim();
+        badge.appendChild(key);
+      });
+    } else {
+      const unset = document.createElement('span');
+      unset.className   = 'shortcut-unset';
+      unset.textContent = 'Not set';
+      badge.appendChild(unset);
+    }
+
+    row.append(info, badge);
+    card.appendChild(row);
+  });
+}
+
+function bindShortcutsEvents() {
+  $('btn-edit-shortcuts').addEventListener('click', () => {
+    chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Schedule
+// ---------------------------------------------------------------------------
+
+async function loadSchedule() {
+  const [res, { slumber_license }] = await Promise.all([
+    msg('GET_SETTINGS'),
+    chrome.storage.sync.get('slumber_license'),
+  ]);
+  const schedule = res.ok ? (res.settings.schedule ?? defaultSchedule()) : defaultSchedule();
+  applyScheduleUI(schedule);
+
+  const isPro = Boolean(slumber_license?.valid);
+  const card    = $('schedule-card');
+  const saveBtn = $('btn-save-schedule');
+  if (card)    card.classList.toggle('pro-locked', !isPro);
+  if (saveBtn) saveBtn.disabled = !isPro;
+}
+
+function defaultSchedule() {
+  return { enabled: false, days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' };
+}
+
+function applyScheduleUI(schedule) {
+  $('toggle-schedule').checked  = schedule.enabled ?? false;
+  $('schedule-config').hidden   = !schedule.enabled;
+
+  const days = Array.isArray(schedule.days) ? schedule.days : [1, 2, 3, 4, 5];
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.classList.toggle('active', days.includes(parseInt(btn.dataset.day, 10)));
+  });
+
+  $('input-start-time').value = schedule.startTime ?? '09:00';
+  $('input-end-time').value   = schedule.endTime   ?? '18:00';
+}
+
+function bindScheduleEvents() {
+  $('toggle-schedule').addEventListener('change', () => {
+    $('schedule-config').hidden = !$('toggle-schedule').checked;
+  });
+
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
+
+  $('btn-save-schedule').addEventListener('click', saveSchedule);
+}
+
+async function saveSchedule() {
+  const enabled   = $('toggle-schedule').checked;
+  const days      = [...document.querySelectorAll('.day-btn.active')]
+    .map(btn => parseInt(btn.dataset.day, 10));
+  const startTime = $('input-start-time').value || '09:00';
+  const endTime   = $('input-end-time').value   || '18:00';
+
+  const currentRes = await msg('GET_SETTINGS');
+  const current = currentRes.ok ? currentRes.settings : {};
+  const settings = { ...current, schedule: { enabled, days, startTime, endTime } };
+
+  const res = await msg('SAVE_SETTINGS', { settings });
+  if (res.ok) showSaveConfirm('save-confirm-schedule');
 }
 
 // ---------------------------------------------------------------------------

@@ -590,6 +590,99 @@ code {
 }
 .welcome-card-dismiss:hover { background: rgba(109,78,212,0.1); }
 
+/* ─── Keyboard Shortcuts ──────────────────────────────────────── */
+.shortcut-row {
+  justify-content: space-between;
+}
+
+.shortcut-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--c-text);
+  background: var(--c-surface2);
+  border: 0.5px solid var(--c-border-md);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 2px 7px;
+  min-width: 24px;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
+.shortcut-sep {
+  font-size: 11px;
+  color: var(--c-text-3);
+  padding: 0 1px;
+}
+
+.shortcut-unset {
+  font-size: 12px;
+  color: var(--c-text-3);
+  font-style: italic;
+}
+
+/* ─── Schedule ────────────────────────────────────────────────── */
+.day-picker {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.day-btn {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 5px;
+  border: 0.5px solid var(--c-border-md);
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.day-btn:hover { background: var(--c-accent-dim); color: var(--c-text); }
+.day-btn.active {
+  background: var(--c-text);
+  color: var(--c-bg);
+  border-color: var(--c-text);
+}
+
+.time-range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.time-input {
+  background: var(--c-surface2);
+  border: 0.5px solid var(--c-border-md);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 13px;
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.time-input:focus { border-color: rgba(167,139,250,0.5); }
+
+.time-sep {
+  font-size: 12px;
+  color: var(--c-text-2);
+}
+
 /* ─── Utility ─────────────────────────────────────────────────── */
 [hidden] { display: none !important; }
 

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Slumber — Tab Suspender",
   "short_name": "Slumber",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Suspend inactive tabs to reclaim memory. Lightweight, private, no telemetry.",
 
   "permissions": [
@@ -12,8 +12,40 @@
   ],
 
   "host_permissions": [
-    "https://dkhandev-site-payment-worker.wolf001349.workers.dev/*"
+    "https://dkhandev-site-payment-worker.wolf001349.workers.dev/*",
+    "<all_urls>"
   ],
+
+  "content_scripts": [
+    {
+      "matches":   ["<all_urls>"],
+      "js":        ["content/media-monitor.js"],
+      "run_at":    "document_start",
+      "world":     "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches":   ["<all_urls>"],
+      "js":        ["content/media-relay.js"],
+      "run_at":    "document_start",
+      "all_frames": true
+    }
+  ],
+
+  "commands": {
+    "suspend-tab": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Sleep the current tab"
+    },
+    "unsuspend-tab": {
+      "suggested_key": { "default": "Alt+Shift+W" },
+      "description": "Wake the current tab"
+    },
+    "unsuspend-all-tabs": {
+      "suggested_key": { "default": "Alt+Shift+A" },
+      "description": "Wake all sleeping tabs in the current window"
+    }
+  },
 
   "background": {
     "service_worker": "background/worker.js"
