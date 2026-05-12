@@ -39,15 +39,19 @@ async function sweepOrphanedAlarms() {
 }
 
 async function sweepOrphanedRegistry() {
-  const [registry, tabs] = await Promise.all([
-    getSuspendedRegistry(),
+  const [all, tabs] = await Promise.all([
+    chrome.storage.local.get(null),
     chrome.tabs.query({}),
   ]);
   const tabIds = new Set(tabs.map(t => t.id));
-  const orphaned = Object.keys(registry).filter(id => !tabIds.has(parseInt(id, 10)));
+  const orphaned = Object.keys(all)
+    .filter(k => k.startsWith(SUSPENDED_KEY_PREFIX))
+    .filter(k => {
+      const id = parseInt(k.slice(SUSPENDED_KEY_PREFIX.length), 10);
+      return isNaN(id) || !tabIds.has(id);
+    });
   if (orphaned.length === 0) return;
-  orphaned.forEach(id => delete registry[id]);
-  await chrome.storage.local.set({ suspended: registry });
+  await chrome.storage.local.remove(orphaned);
 }
 
 // Returns true when auto-suspend is allowed at the current moment.
@@ -94,9 +98,38 @@ async function getSettings() {
   return settings ?? defaultSettings();
 }
 
+// Per-tab storage keys prevent concurrent alarm handlers from overwriting each
+// other when multiple tabs are auto-suspended at the same time.
+const SUSPENDED_KEY_PREFIX = 'suspended_';
+
+function suspendedTabKey(tabId) {
+  return `${SUSPENDED_KEY_PREFIX}${tabId}`;
+}
+
 async function getSuspendedRegistry() {
+  const all = await chrome.storage.local.get(null);
+  const registry = {};
+  for (const [key, val] of Object.entries(all)) {
+    if (key.startsWith(SUSPENDED_KEY_PREFIX)) {
+      const id = parseInt(key.slice(SUSPENDED_KEY_PREFIX.length), 10);
+      if (!isNaN(id)) registry[id] = val;
+    }
+  }
+  return registry;
+}
+
+// Migrates the old shared { suspended: { [tabId]: entry } } format to per-tab
+// keys on first startup after this change.
+async function migrateOldRegistry() {
   const { suspended } = await chrome.storage.local.get('suspended');
-  return suspended ?? {};
+  if (!suspended || typeof suspended !== 'object' || Array.isArray(suspended)) return;
+  const entries = Object.entries(suspended);
+  if (entries.length > 0) {
+    const toSet = {};
+    for (const [id, entry] of entries) toSet[suspendedTabKey(id)] = entry;
+    await chrome.storage.local.set(toSet);
+  }
+  await chrome.storage.local.remove('suspended');
 }
 
 function defaultSettings() {
@@ -183,14 +216,12 @@ async function suspendTab(tabId, opts = {}) {
     suspendedAt: Date.now(),
   };
 
-  const registry = await getSuspendedRegistry();
-  registry[tabId] = entry;
-
   const { slumber_stats: stats = {} } = await chrome.storage.local.get('slumber_stats');
   stats.totalSuspended = (stats.totalSuspended ?? 0) + 1;
   if (!stats.installDate) stats.installDate = Date.now();
 
-  await chrome.storage.local.set({ suspended: registry, slumber_stats: stats });
+  // Per-tab key write is safe under concurrency — no shared object to overwrite.
+  await chrome.storage.local.set({ [suspendedTabKey(tabId)]: entry, slumber_stats: stats });
   await chrome.tabs.update(tabId, { url: buildSuspendedUrl(entry) });
   await clearTabAlarm(tabId);
 }
@@ -204,11 +235,22 @@ async function suspendTabs(tabIds, opts = {}) {
 async function unsuspendTab(tabId) {
   const registry = await getSuspendedRegistry();
   const entry = registry[tabId];
-  if (!entry) return;
 
-  await chrome.tabs.update(tabId, { url: entry.url });
-  delete registry[tabId];
-  await chrome.storage.local.set({ suspended: registry });
+  let url;
+  if (entry) {
+    url = entry.url;
+  } else {
+    // Fallback: entry may be missing if it was lost in a prior write race.
+    // The original URL is always encoded in the suspended page's hash.
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (!tab || !isSlumberPage(tab.url)) return;
+    const params = new URLSearchParams(new URL(tab.url).hash.slice(1));
+    url = params.get('url');
+    if (!url) return;
+  }
+
+  await chrome.tabs.update(tabId, { url });
+  await chrome.storage.local.remove(suspendedTabKey(tabId));
 }
 
 function buildSuspendedUrl({ url, title, favicon }) {
@@ -267,8 +309,7 @@ const SWEEP_INTERVAL = 5;
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === 'install') {
     await chrome.storage.local.set({
-      settings:     defaultSettings(),
-      suspended:    {},
+      settings:      defaultSettings(),
       slumber_stats: { totalSuspended: 0, installDate: Date.now() },
     });
     await chrome.tabs.create({
@@ -279,6 +320,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
+  await migrateOldRegistry();
   await bootstrapAlarms();
   revalidateLicense(); // fire-and-forget; network failures keep last stored state
 });
@@ -349,11 +391,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   // Navigation invalidates any previously tracked capture state for this tab.
   _capturingFrames.delete(tabId);
 
-  const registry = await getSuspendedRegistry();
-  if (registry[tabId]) {
-    delete registry[tabId];
-    await chrome.storage.local.set({ suspended: registry });
-  }
+  await chrome.storage.local.remove(suspendedTabKey(tabId));
 
   const settings = await getSettings();
   if (settings.autoSuspend) await scheduleTabAlarm(tabId, settings.autoSuspendDelay);
@@ -362,11 +400,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   _capturingFrames.delete(tabId);
   await clearTabAlarm(tabId);
-  const registry = await getSuspendedRegistry();
-  if (registry[tabId]) {
-    delete registry[tabId];
-    await chrome.storage.local.set({ suspended: registry });
-  }
+  await chrome.storage.local.remove(suspendedTabKey(tabId));
 });
 
 // ---------------------------------------------------------------------------
@@ -375,9 +409,8 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'unsuspend-all-tabs') {
-    const registry = await getSuspendedRegistry();
     const tabs = await chrome.tabs.query({ currentWindow: true });
-    const sleeping = tabs.filter(t => registry[t.id]);
+    const sleeping = tabs.filter(t => isSlumberPage(t.url));
     await Promise.all(sleeping.map(t => unsuspendTab(t.id)));
     return;
   }
